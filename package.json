@@ -1,0 +1,22 @@
+{
+  "name": "koishi-plugin-brick",
+  "description": "功夫再好，一砖撂倒。烧制砖头来拍群友吧，拍好了禁言他，没拍好被禁言！",
+  "version": "0.0.1",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "dist"
+  ],
+  "license": "MIT",
+  "scripts": {},
+  "keywords": [
+    "chatbot",
+    "koishi",
+    "plugin"
+  ],
+  "devDependencies": {},
+  "peerDependencies": {
+    "koishi": "^4.17.9"
+  }
+}
