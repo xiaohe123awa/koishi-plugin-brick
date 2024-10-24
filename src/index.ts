@@ -3,7 +3,9 @@ import { Context, Schema, Random, h, $ } from 'koishi'
 export const name = 'brick'
 
 export const usage = `更新日志：https://forum.koishi.xyz/t/topic/9593  
-烧的砖头不跨群哦`
+烧制砖块，然后拍晕群友！  
+开始烧制之后，群内其他群友发送一定数量的消息就能完成烧制！  
+烧出来的砖头不能跨群用哦！  `
 
 export interface Brick {
   id: number
@@ -118,6 +120,7 @@ export function apply(ctx: Context, config: Config) {
 
   ctx.command("砖头.拍人 <user:user>", "拍晕（禁言）对方随机时间，有概率被反将一军")
     .alias("拍人")
+    .example("拍人 @koishi")
     .action(async ({session}, user) => {
       let brickData = await ctx.database.get('brick', {
         userId: session.userId, 
