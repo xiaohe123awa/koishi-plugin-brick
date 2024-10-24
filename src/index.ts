@@ -118,7 +118,7 @@ export function apply(ctx: Context, config: Config) {
 
     })
 
-  ctx.command("砖头.拍人 <user:user>", "拍晕（禁言）对方随机时间，有概率被反将一军")
+  ctx.command("砖头.拍人 <user:user>", "拍晕（禁言）对方随机时间，有概率被反将一军", {checkArgCount: true})
     .alias("拍人")
     .example("拍人 @koishi")
     .action(async ({session}, user) => {
