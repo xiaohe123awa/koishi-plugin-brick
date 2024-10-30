@@ -4,6 +4,7 @@ export const name = 'brick'
 
 export const usage = `更新日志：https://forum.koishi.xyz/t/topic/9593  
 烧制砖块，然后拍晕群友！  
+如果机器人没有禁言的权限，将改为停止响应被拍晕的用户相同时间！  
 开始烧制之后，群内其他群友发送一定数量的消息就能完成烧制！  
 烧出来的砖头不能跨群用哦！  `
 
@@ -14,6 +15,7 @@ export interface Brick {
   brick: number
   burning: boolean
   lastSlap: number
+  checkingDay: string
 }
 
 declare module 'koishi' {
@@ -29,28 +31,50 @@ export interface Config {
   minMuteTime: number
   maxMuteTime: number
   reverse: number
+  checking: boolean
+  minGain?: number
+  maxGain?: number
 }
 
-export const Config: Schema<Config> = Schema.object({
-  maxBrick: Schema.number()
-    .default(1)
-    .description('砖块最多持有量'),
-  cost: Schema.number()
-    .required()
-    .description('多少条消息能烧好一块砖'),
-  cooldown: Schema.number()
-    .default(60)
-    .description('拍砖冷却时间（秒）'),
-  minMuteTime: Schema.number()
-    .default(10)
-    .description('最小禁言时间（秒）'),
-  maxMuteTime: Schema.number()
-    .default(120)
-    .description('最大禁言时间（秒）'),
-  reverse: Schema.number()
-    .default(10)
-    .description('反被拍晕的概率（%）'),
-})
+export const Config: Schema<Config> = Schema.intersect([
+  Schema.object({
+    maxBrick: Schema.number()
+      .default(1)
+      .description('砖块最多持有量'),
+    cost: Schema.number()
+      .required()
+      .description('多少条消息能烧好一块砖'),
+    cooldown: Schema.number()
+      .default(60)
+      .description('拍砖冷却时间（秒）'),
+    minMuteTime: Schema.number()
+      .default(10)
+      .description('最小禁言时间（秒）'),
+    maxMuteTime: Schema.number()
+      .default(120)
+      .description('最大禁言时间（秒）'),
+    reverse: Schema.number()
+      .default(10)
+      .description('反被拍晕的概率（%）'),
+  }),
+
+  Schema.object({
+    checking: Schema.boolean()
+      .default(false)
+      .description('是否开启每日签到（获取随机数量的砖头）'),
+  }),
+  Schema.union([
+    Schema.object({
+      checking: Schema.const(true).required(),
+      minGain: Schema.number().required().description('最小获取数量'),
+      maxGain: Schema.number().required().description('最大获取数量'),
+    }),
+    Schema.object({
+      checking: Schema.const(false)
+    })
+  ])
+
+])
 
 export const inject = ["database"]
 
@@ -61,7 +85,8 @@ export function apply(ctx: Context, config: Config) {
     guildId: 'string',
     brick: 'unsigned',
     burning: 'boolean',
-    lastSlap: 'unsigned'
+    lastSlap: 'unsigned',
+    checkingDay: 'string'
   }, {primary: 'id', autoInc: true})
 
   ctx.command("砖头")
@@ -96,7 +121,7 @@ export function apply(ctx: Context, config: Config) {
       let messageCount = 0
 
       let dispose = ctx.guild(session.guildId).middleware(async (session_in, next) => {
-        if (![session.userId, session.selfId].includes(session_in.userId)) {
+        if (![session.userId, session.selfId].includes(session_in.userId) || true) {
           messageCount += 1
 
           if (messageCount >= config.cost) {
@@ -151,10 +176,21 @@ export function apply(ctx: Context, config: Config) {
 
       if (Random.bool(config.reverse / 100)) {
         await session.bot.muteGuildMember(session.guildId, session.userId, muteTimeMs)
+        silent(session.userId)
         return `${h.at(session.userId)} 对方夺过你的砖头，把你被拍晕了 ${muteTime} 秒`
       } else {
         await session.bot.muteGuildMember(session.guildId, targetUserId, muteTimeMs)
+        silent(targetUserId)
         return `${h.at(targetUserId)} 你被 ${h.at(session.userId)} 拍晕了 ${muteTime} 秒`
+      }
+
+      function silent(userId: string) {
+        ctx.guild(session.guildId).middleware((session, next) => {
+          if (session.userId == userId) {
+            return
+          }
+          next()
+        }, true)
       }
     })
 
@@ -172,8 +208,47 @@ export function apply(ctx: Context, config: Config) {
         return `你有 ${brickData[0].brick}/${config.maxBrick} 块砖头`
       }
     })
+
+  if (config.checking) {
+    ctx.command("砖头.签到")
+      .alias("砖头签到")
+      .action(async ({session}) => {
+        let date = new Date()
+        let today = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
+        let brick = Random.int(config.minGain, config.maxGain + 1)
+
+        let userData = await ctx.database.get('brick', {
+          userId: session.userId, 
+          guildId: session.guildId,
+        })
+
+        if (userData.length === 0) {
+          await ctx.database.create('brick', {
+            userId: session.userId, 
+            guildId: session.guildId,
+            brick: brick,
+            checkingDay: today
+          })
+
+          return `签到成功，你获得了 ${brick} 块砖头，你现在有${brick}/${config.maxBrick}块砖头`
+        } else if (userData[0].brick >= config.maxBrick) {
+          return `你的砖头已经到上限了，用掉再签到吧`
+        } else if (userData[0].checkingDay !== today) {
+          if (userData[0].brick + brick > config.maxBrick) {
+            brick = config.maxBrick - userData[0].brick
+          }
+
+          await ctx.database.upsert('brick', (row) => [{
+                  userId: session.userId,
+                  guildId: session.guildId,
+                  brick: $.add(row.brick, brick),
+                  checkingDay: today
+                }], ["userId", "guildId"])
+
+          return `签到成功，获得了 ${brick} 块砖头，现在你有 ${userData[0].brick + brick}/${config.maxBrick} 块砖头`
+        } else {
+          return "你今天已经签到过了"
+        }
+      })
+  }
 }
-
-
-
-
