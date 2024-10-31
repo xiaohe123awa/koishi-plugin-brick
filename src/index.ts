@@ -78,7 +78,7 @@ export const Config: Schema<Config> = Schema.intersect([
 
 export const inject = ["database"]
 
-export function apply(ctx: Context, config: Config) {
+export async function apply(ctx: Context, config: Config) {
   ctx.model.extend('brick', {
     id: 'unsigned',
     userId: 'string',
@@ -89,6 +89,10 @@ export function apply(ctx: Context, config: Config) {
     checkingDay: 'string'
   }, {primary: 'id', autoInc: true})
 
+  await ctx.database.set('brick', {}, {
+    burning: false,
+  })
+  
   ctx.command("砖头")
 
   ctx.command("砖头.烧砖", "烧点砖头拍人")
@@ -121,7 +125,7 @@ export function apply(ctx: Context, config: Config) {
       let messageCount = 0
 
       let dispose = ctx.guild(session.guildId).middleware(async (session_in, next) => {
-        if (![session.userId, session.selfId].includes(session_in.userId) || true) {
+        if (![session.userId, session.selfId].includes(session_in.userId)) {
           messageCount += 1
 
           if (messageCount >= config.cost) {
@@ -176,21 +180,24 @@ export function apply(ctx: Context, config: Config) {
 
       if (Random.bool(config.reverse / 100)) {
         await session.bot.muteGuildMember(session.guildId, session.userId, muteTimeMs)
-        silent(session.userId)
+        silent(session.userId, muteTimeMs)
         return `${h.at(session.userId)} 对方夺过你的砖头，把你被拍晕了 ${muteTime} 秒`
       } else {
         await session.bot.muteGuildMember(session.guildId, targetUserId, muteTimeMs)
-        silent(targetUserId)
+        silent(targetUserId, muteTimeMs)
         return `${h.at(targetUserId)} 你被 ${h.at(session.userId)} 拍晕了 ${muteTime} 秒`
       }
 
-      function silent(userId: string) {
-        ctx.guild(session.guildId).middleware((session, next) => {
-          if (session.userId == userId) {
-            return
+      function silent(userId: string, time: number) {
+        let dispose = ctx.guild(session.guildId).middleware((session, next) => {
+          if (session.userId !== userId) {
+            return next()
           }
-          next()
         }, true)
+
+        ctx.setTimeout(() => {
+          dispose()
+        }, time)
       }
     })
 
