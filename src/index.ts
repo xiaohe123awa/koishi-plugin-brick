@@ -125,7 +125,6 @@ export async function apply(ctx: Context, config: Config) {
       let messageCount = 0
 
       let dispose = ctx.guild(session.guildId).middleware(async (session_in, next) => {
-        console.log(1)
         if (![session.userId, session.selfId].includes(session_in.userId)) {
           messageCount += 1
 
@@ -183,7 +182,7 @@ export async function apply(ctx: Context, config: Config) {
       if (Random.bool(config.reverse / 100)) {
         await session.bot.muteGuildMember(session.guildId, session.userId, muteTimeMs)
         silent(session.userId, muteTimeMs)
-        return `${h.at(session.userId)} 对方夺过你的砖头，把你拍晕了 ${muteTime} 秒`
+        return `${h.at(targetUserId)} 夺过你的砖头，把你拍晕了 ${muteTime} 秒`
       } else {
         await session.bot.muteGuildMember(session.guildId, targetUserId, muteTimeMs)
         silent(targetUserId, muteTimeMs)
@@ -201,6 +200,16 @@ export async function apply(ctx: Context, config: Config) {
           dispose()
         }, time)
       }
+    })
+
+  ctx.command("砖头.随机拍人", "随机拍晕（禁言）某个群友随机时间，有概率被反将一军")
+    .alias("随机拍人")
+    .action(async ({session}) => {
+      let guildMember = []
+      for await (let member of session.bot.getGuildMemberIter(session.guildId)) {
+        guildMember.push(member?.user.id)
+      }
+      await session.execute(`砖头.拍人 ${h.at(Random.pick(guildMember))}`)
     })
 
   ctx.command("砖头.查看", "看看自己在这个群有多少砖头")
