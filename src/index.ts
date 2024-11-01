@@ -125,6 +125,7 @@ export async function apply(ctx: Context, config: Config) {
       let messageCount = 0
 
       let dispose = ctx.guild(session.guildId).middleware(async (session_in, next) => {
+        console.log(1)
         if (![session.userId, session.selfId].includes(session_in.userId)) {
           messageCount += 1
 
@@ -143,7 +144,7 @@ export async function apply(ctx: Context, config: Config) {
         }
 
         return next()
-      })
+      }, true)
 
     })
 
@@ -151,6 +152,7 @@ export async function apply(ctx: Context, config: Config) {
     .alias("拍人")
     .example("拍人 @koishi")
     .action(async ({session}, user) => {
+      console.log(user)
       let brickData = await ctx.database.get('brick', {
         userId: session.userId, 
         guildId: session.guildId
@@ -181,7 +183,7 @@ export async function apply(ctx: Context, config: Config) {
       if (Random.bool(config.reverse / 100)) {
         await session.bot.muteGuildMember(session.guildId, session.userId, muteTimeMs)
         silent(session.userId, muteTimeMs)
-        return `${h.at(session.userId)} 对方夺过你的砖头，把你被拍晕了 ${muteTime} 秒`
+        return `${h.at(session.userId)} 对方夺过你的砖头，把你拍晕了 ${muteTime} 秒`
       } else {
         await session.bot.muteGuildMember(session.guildId, targetUserId, muteTimeMs)
         silent(targetUserId, muteTimeMs)
