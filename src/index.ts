@@ -151,7 +151,6 @@ export async function apply(ctx: Context, config: Config) {
     .alias("拍人")
     .example("拍人 @koishi")
     .action(async ({session}, user) => {
-      console.log(user)
       let brickData = await ctx.database.get('brick', {
         userId: session.userId, 
         guildId: session.guildId
