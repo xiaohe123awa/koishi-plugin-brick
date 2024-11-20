@@ -13,7 +13,6 @@ export interface Brick {
   userId: string
   guildId: string
   brick: number
-  burning: boolean
   lastSlap: number
   checkingDay: string
 }
@@ -78,47 +77,52 @@ export const Config: Schema<Config> = Schema.intersect([
 
 export const inject = ["database"]
 
+interface Users {
+  [user: string]: Status
+}
+
+interface Status {
+  burning: boolean
+  muted: boolean
+}
+
 export async function apply(ctx: Context, config: Config) {
   ctx.model.extend('brick', {
     id: 'unsigned',
     userId: 'string',
     guildId: 'string',
     brick: 'unsigned',
-    burning: 'boolean',
     lastSlap: 'unsigned',
     checkingDay: 'string'
   }, {primary: 'id', autoInc: true})
 
-  await ctx.database.set('brick', {}, {
-    burning: false,
-  })
+  let users: Users
   
   ctx.command("砖头")
 
   ctx.command("砖头.烧砖", "烧点砖头拍人")
     .alias("烧砖")
     .action(async ({ session }) => {
-      let user = await ctx.database.get('brick', {
+      let user = `${session.guildId}:${session.userId}`
+
+      let userData = await ctx.database.get('brick', {
         userId: session.userId, 
         guildId: session.guildId
       })
 
-      if (user.length === 0) {
+      if (userData.length === 0) {
         await ctx.database.create('brick', {
           userId: session.userId, 
           guildId: session.guildId, 
           brick: 0
         })
-      } else if (user[0].brick >= config.maxBrick) {
+      } else if (userData[0].brick >= config.maxBrick) {
         return `你最多只能拥有${config.maxBrick}块砖`
-      } else if (user[0].burning) {
+      } else if (users[user].burning) {
         return `已经在烧砖了`
       }
 
-      await ctx.database.set('brick', {
-        userId: session.userId, 
-        guildId: session.guildId
-      }, {burning: true})
+      users[user].burning = true
 
       await session.send(`现在开始烧砖啦，群友每发送${config.cost}条消息就烧好一块砖`)
 
@@ -135,8 +139,9 @@ export async function apply(ctx: Context, config: Config) {
               userId: session.userId, 
               guildId: session.guildId, 
               brick: $.add(row.brick, 1), 
-              burning: false
             }], ["userId", "guildId"])
+
+            users[user].burning = false
 
             await session.send(`${h.at(session.userId)} 砖已经烧好啦`)
           }
@@ -151,6 +156,8 @@ export async function apply(ctx: Context, config: Config) {
     .alias("拍人")
     .example("拍人 @koishi")
     .action(async ({session}, user) => {
+      let targetUserId = user.split(":")[1]
+
       let brickData = await ctx.database.get('brick', {
         userId: session.userId, 
         guildId: session.guildId
@@ -164,6 +171,8 @@ export async function apply(ctx: Context, config: Config) {
 
       if (diff < config.cooldown) {
         return `${Math.abs(diff - config.cooldown)} 秒后才能再拍人哦`
+      } else if (users[`${session.guildId}:${targetUserId}`].muted) {
+        return "他已经晕了..."
       }
 
       await ctx.database.upsert('brick', (row) => [{
@@ -173,16 +182,16 @@ export async function apply(ctx: Context, config: Config) {
         lastSlap: Date.now() / 1000
       }], ["userId", "guildId"])
 
-      let [platform, targetUserId] = user.split(":")
-
       let muteTime = Random.int(config.minMuteTime, config.maxMuteTime)
       let muteTimeMs = muteTime * 1000
 
       if (Random.bool(config.reverse / 100)) {
+        users[`${session.guildId}:${session.userId}`].muted = true
         await session.bot.muteGuildMember(session.guildId, session.userId, muteTimeMs)
         silent(session.userId, muteTimeMs)
         return `${h.at(targetUserId)} 夺过你的砖头，把你拍晕了 ${muteTime} 秒`
       } else {
+        users[`${session.guildId}:${targetUserId}`].muted = true
         await session.bot.muteGuildMember(session.guildId, targetUserId, muteTimeMs)
         silent(targetUserId, muteTimeMs)
         return `${h.at(targetUserId)} 你被 ${h.at(session.userId)} 拍晕了 ${muteTime} 秒`
@@ -197,6 +206,7 @@ export async function apply(ctx: Context, config: Config) {
 
         ctx.setTimeout(() => {
           dispose()
+          users[`${session.guildId}:${userId}`].muted = false
         }, time)
       }
     })
