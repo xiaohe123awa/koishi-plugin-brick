@@ -27,6 +27,7 @@ export interface Config {
   maxBrick: number
   cost: number
   cooldown: number
+  feedback: boolean
   minMuteTime: number
   maxMuteTime: number
   reverse: number
@@ -46,6 +47,9 @@ export const Config: Schema<Config> = Schema.intersect([
     cooldown: Schema.number()
       .default(60)
       .description('拍砖冷却时间（秒）'),
+    feedback: Schema.boolean()
+      .default(true)
+      .description('被拍晕时调用机器人是否告知用户已被拍晕'),
     minMuteTime: Schema.number()
       .default(10)
       .description('最小禁言时间（秒）'),
@@ -82,8 +86,8 @@ interface Users {
 }
 
 interface Status {
-  burning: boolean
-  muted: boolean
+  burning?: boolean
+  muted?: boolean
 }
 
 export async function apply(ctx: Context, config: Config) {
@@ -96,7 +100,7 @@ export async function apply(ctx: Context, config: Config) {
     checkingDay: 'string'
   }, {primary: 'id', autoInc: true})
 
-  let users: Users
+  let users: Users = {}
   
   ctx.command("砖头")
 
@@ -104,6 +108,9 @@ export async function apply(ctx: Context, config: Config) {
     .alias("烧砖")
     .action(async ({ session }) => {
       let user = `${session.guildId}:${session.userId}`
+      if (!users[user]) {
+        users[user] = {}
+      }
 
       let userData = await ctx.database.get('brick', {
         userId: session.userId, 
@@ -118,7 +125,7 @@ export async function apply(ctx: Context, config: Config) {
         })
       } else if (userData[0].brick >= config.maxBrick) {
         return `你最多只能拥有${config.maxBrick}块砖`
-      } else if (users[user].burning) {
+      } else if (users?.[user]?.burning) {
         return `已经在烧砖了`
       }
 
@@ -171,7 +178,7 @@ export async function apply(ctx: Context, config: Config) {
 
       if (diff < config.cooldown) {
         return `${Math.abs(diff - config.cooldown)} 秒后才能再拍人哦`
-      } else if (users[`${session.guildId}:${targetUserId}`].muted) {
+      } else if (users[`${session.guildId}:${targetUserId}`]?.muted) {
         return "他已经晕了..."
       }
 
@@ -186,21 +193,33 @@ export async function apply(ctx: Context, config: Config) {
       let muteTimeMs = muteTime * 1000
 
       if (Random.bool(config.reverse / 100)) {
-        users[`${session.guildId}:${session.userId}`].muted = true
+        if (users[`${session.guildId}:${session.userId}`]) {
+          users[`${session.guildId}:${session.userId}`].muted = true
+        } else {
+          users[`${session.guildId}:${session.userId}`] = { muted: true }
+        }
         await session.bot.muteGuildMember(session.guildId, session.userId, muteTimeMs)
         silent(session.userId, muteTimeMs)
         return `${h.at(targetUserId)} 夺过你的砖头，把你拍晕了 ${muteTime} 秒`
       } else {
-        users[`${session.guildId}:${targetUserId}`].muted = true
+        if (users[`${session.guildId}:${targetUserId}`]) {
+          users[`${session.guildId}:${targetUserId}`].muted = true
+        } else {
+          users[`${session.guildId}:${targetUserId}`] = { muted: true }
+        }
         await session.bot.muteGuildMember(session.guildId, targetUserId, muteTimeMs)
         silent(targetUserId, muteTimeMs)
         return `${h.at(targetUserId)} 你被 ${h.at(session.userId)} 拍晕了 ${muteTime} 秒`
       }
 
       function silent(userId: string, time: number) {
+        let now = Date.now()
         let dispose = ctx.guild(session.guildId).middleware((session, next) => {
           if (session.userId !== userId) {
             return next()
+          }
+          if (config.feedback) {
+            session.send(`你被拍晕了，${Math.trunc((now + time - Date.now()) / 1000)} 秒后恢复`)
           }
         }, true)
 
