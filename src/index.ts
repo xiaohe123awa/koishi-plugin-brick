@@ -27,7 +27,6 @@ export interface Config {
   maxBrick: number
   cost: number
   cooldown: number
-  feedback: boolean
   minMuteTime: number
   maxMuteTime: number
   reverse: number
@@ -47,9 +46,6 @@ export const Config: Schema<Config> = Schema.intersect([
     cooldown: Schema.number()
       .default(60)
       .description('拍砖冷却时间（秒）'),
-    feedback: Schema.boolean()
-      .default(true)
-      .description('被拍晕时调用机器人是否告知用户已被拍晕'),
     minMuteTime: Schema.number()
       .default(10)
       .description('最小禁言时间（秒）'),
