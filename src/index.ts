@@ -213,13 +213,9 @@ export async function apply(ctx: Context, config: Config) {
       }
 
       function silent(userId: string, time: number) {
-        let now = Date.now()
         let dispose = ctx.guild(session.guildId).middleware((session, next) => {
           if (session.userId !== userId) {
             return next()
-          }
-          if (config.feedback) {
-            session.send(`你被拍晕了，${Math.trunc((now + time - Date.now()) / 1000)} 秒后恢复`)
           }
         }, true)
 
