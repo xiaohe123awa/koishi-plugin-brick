@@ -23,6 +23,10 @@ declare module 'koishi' {
   }
 }
 
+interface SpecialUser {
+  [userId: string]: number
+}
+
 export interface Config {
   maxBrick: number
   cost: number
@@ -30,6 +34,7 @@ export interface Config {
   minMuteTime: number
   maxMuteTime: number
   reverse: number
+  specialUser: SpecialUser
   checking: boolean
   minGain?: number
   maxGain?: number
@@ -54,7 +59,12 @@ export const Config: Schema<Config> = Schema.intersect([
       .description('最大禁言时间（秒）'),
     reverse: Schema.number()
       .default(10)
-      .description('反被拍晕的概率（%）'),
+      .max(100)
+      .description('反被拍晕的默认概率（%）'),
+    specialUser: Schema.dict(Number)
+      .role('table')
+      .description('键为用户ID，值为被拍时的反击概率（%）<br/>不设置则使用默认概率'),
+      
   }),
 
   Schema.object({
@@ -188,7 +198,11 @@ export async function apply(ctx: Context, config: Config) {
       let muteTime = Random.int(config.minMuteTime, config.maxMuteTime)
       let muteTimeMs = muteTime * 1000
 
-      if (Random.bool(config.reverse / 100)) {
+      let probability = config.specialUser[targetUserId] !== undefined 
+        ? config.specialUser[targetUserId] / 100 
+        : config.reverse / 100;
+
+      if (Random.bool(probability)) {
         if (users[`${session.guildId}:${session.userId}`]) {
           users[`${session.guildId}:${session.userId}`].muted = true
         } else {
