@@ -24,7 +24,7 @@ declare module 'koishi' {
 }
 
 interface SpecialUser {
-  [userId: string]: number
+  [userId: string]: number 
 }
 
 export interface Config {
