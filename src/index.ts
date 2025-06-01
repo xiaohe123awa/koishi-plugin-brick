@@ -101,7 +101,7 @@ export async function apply(ctx: Context, config: Config) {
     id: 'unsigned',
     userId: 'string',
     guildId: 'string',
-    brick: 'unsigned',
+    brick: 'integer',
     lastSlap: 'unsigned',
     checkingDay: 'string'
   }, {primary: 'id', autoInc: true})
@@ -215,12 +215,11 @@ export async function apply(ctx: Context, config: Config) {
         : config.reverse / 100
 
       if (Random.bool(probability)) {
-        slap(targetUserId)
-        return `${h.at(targetUserId)} 你被 ${h.at(session.userId)} 拍晕了 ${muteTime} 秒`
-      } else {
         slap(session.userId)
         return `${h.at(targetUserId)} 夺过你的砖头，把你拍晕了 ${muteTime} 秒`
-
+      } else {
+        slap(targetUserId)
+        return `${h.at(targetUserId)} 你被 ${h.at(session.userId)} 拍晕了 ${muteTime} 秒`
       }
 
       async function slap(slapedUserId: string) {
