@@ -142,7 +142,7 @@ export async function apply(ctx: Context, config: Config) {
       let messageCount = 0
 
       const dispose = ctx.guild(session.guildId).middleware(async (session_in, next) => {
-        if (![session.selfId].includes(session_in.userId)) {
+        if (![session.selfId, session.userId].includes(session_in.userId)) {
           messageCount += 1
 
           if (messageCount >= config.cost) {
