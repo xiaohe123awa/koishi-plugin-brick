@@ -208,6 +208,9 @@ export async function apply(ctx: Context, config: Config) {
       }], ["userId", "guildId"])
 
       const muteTime = Random.int(config.minMuteTime, config.maxMuteTime)
+      if （targetUserId === 3420908241） { // 如果目标ID为xxx则
+          const muteTime = Random.int(2500, 5200) // 在2500-5200中取随机数
+      }
       const muteTimeMs = muteTime * 1000
 
       const probability = config.specialUser[targetUserId] !== undefined 
